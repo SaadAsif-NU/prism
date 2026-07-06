@@ -1,0 +1,11 @@
+id,name,department,salary,age,remote
+1,Ada Lovelace,Engineering,145000,36,true
+2,Grace Hopper,Engineering,152000,45,false
+3,Alan Turing,Research,138000,41,true
+4,Katherine Johnson,Research,141000,50,false
+5,Margaret Hamilton,Engineering,149000,33,true
+6,Edsger Dijkstra,Research,,58,false
+7,Donald Knuth,Research,160000,,true
+8,Barbara Liskov,Engineering,151000,47,false
+9,John McCarthy,Research,133000,52,true
+10,Dennis Ritchie,Engineering,147000,39,false
