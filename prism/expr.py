@@ -318,6 +318,42 @@ class IsNullExpr(Expression):
         return self.output_name()
 
 
+class ScalarFunction(Expression):
+    """A call to a registered row-wise function (e.g. ``UPPER(name)``)."""
+
+    def __init__(self, name: str, args: list[Expression]) -> None:
+        self.name = name.upper()
+        self.args = args
+
+    def evaluate(self, table: Table) -> Column:
+        from prism.functions import get
+
+        fn = get(self.name)
+        fn.check_arity(len(self.args))
+        columns = [arg.evaluate(table) for arg in self.args]
+        return fn.kernel(columns, self.output_name())
+
+    def resolve_type(self, schema: Schema) -> DataType:
+        from prism.functions import get
+
+        fn = get(self.name)
+        fn.check_arity(len(self.args))
+        return fn.type_rule([arg.resolve_type(schema) for arg in self.args])
+
+    def references(self) -> set[str]:
+        refs: set[str] = set()
+        for arg in self.args:
+            refs |= arg.references()
+        return refs
+
+    def output_name(self) -> str:
+        inner = ", ".join(arg.output_name() for arg in self.args)
+        return f"{self.name}({inner})"
+
+    def __repr__(self) -> str:
+        return self.output_name()
+
+
 # ----------------------------------------------------------------------
 # builder helpers
 # ----------------------------------------------------------------------
