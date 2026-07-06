@@ -7,6 +7,19 @@ The public surface is intentionally small. Load data into a
 
 from __future__ import annotations
 
+from prism.column import Column
+from prism.expr import Expression, col, lit
+from prism.table import Table
+from prism.types import DataType
+
 __version__ = "0.1.0"
 
-__all__ = ["__version__"]
+__all__ = [
+    "Column",
+    "DataType",
+    "Expression",
+    "Table",
+    "__version__",
+    "col",
+    "lit",
+]
