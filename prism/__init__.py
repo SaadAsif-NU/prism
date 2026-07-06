@@ -8,6 +8,7 @@ The public surface is intentionally small. Load data into a
 from __future__ import annotations
 
 from prism.column import Column
+from prism.engine import Database
 from prism.exec.operators import SortKey
 from prism.expr import Expression, col, lit
 from prism.relation import Relation
@@ -20,6 +21,7 @@ __version__ = "0.1.0"
 __all__ = [
     "Catalog",
     "Column",
+    "Database",
     "DataType",
     "Expression",
     "Relation",
