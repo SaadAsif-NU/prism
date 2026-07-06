@@ -1,0 +1,76 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "prism-sql"
+version = "0.1.0"
+description = "A columnar, vectorized SQL query engine built from scratch in pure Python + NumPy. Typed column store with null bitmaps, a hand-written SQL parser, a rule-based optimizer, and a Volcano execution engine. No database, no ORM."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Saad Asif", email = "saadasif7a@gmail.com" }]
+keywords = [
+    "sql",
+    "query-engine",
+    "columnar",
+    "vectorized-execution",
+    "database",
+    "query-optimizer",
+    "olap",
+    "analytics",
+    "numpy",
+    "from-scratch",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Education",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Database :: Database Engines/Servers",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+]
+dependencies = ["numpy>=1.26"]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=4.1",
+    "ruff>=0.3",
+    "mypy>=1.9",
+]
+
+[project.urls]
+Homepage = "https://github.com/SaadAsif-NU/prism"
+Repository = "https://github.com/SaadAsif-NU/prism"
+
+[tool.hatch.build.targets.wheel]
+packages = ["prism"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+# Keep the in-repo package importable no matter how pytest is invoked
+# (editable installs can be flaky when the checkout path is iCloud-synced).
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "C4"]
+ignore = ["E501"]
+
+[tool.mypy]
+# Target 3.12 so mypy parses modern typed-stdlib syntax; runtime support down
+# to 3.10 is enforced by the CI test matrix.
+python_version = "3.12"
+warn_unused_ignores = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
+files = ["prism"]
