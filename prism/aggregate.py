@@ -159,7 +159,7 @@ def _reduce_minmax(
 
     values = arg.values.astype(np.float64)
     fill = np.inf if spec.func is AggFunc.MIN else -np.inf
-    acc = np.full(n_groups, fill, dtype=np.float64)
+    acc: np.ndarray = np.full(n_groups, fill, dtype=np.float64)
     gids = group_ids[arg.validity]
     vals = values[arg.validity]
     if spec.func is AggFunc.MIN:
@@ -167,9 +167,8 @@ def _reduce_minmax(
     else:
         np.maximum.at(acc, gids, vals)
     acc = np.where(group_valid, acc, 0.0)
-    return Column(
-        spec.output_name, spec.output_type, acc.astype(numpy_dtype(spec.output_type)), group_valid
-    )
+    out: np.ndarray = acc.astype(numpy_dtype(spec.output_type))
+    return Column(spec.output_name, spec.output_type, out, group_valid)
 
 
 def _reduce_minmax_text(
