@@ -40,6 +40,8 @@ Analytical databases are fast because of two decisions that show up everywhere i
 
 **A pull-based operator tree.** A query is a tree of operators with a `Scan` at each leaf. Each operator exposes `execute()` to produce its result and `schema()` to report its output types without touching data, so a plan can be type-checked and printed with `EXPLAIN` before it runs.
 
+**A rule-based optimizer.** Because the logical and physical plan are the same operator tree, the optimizer rewrites that tree in place-of-thought, running three semantics-preserving rules to a fixpoint: **constant folding** (evaluate column-free subexpressions, simplify `x AND TRUE`), **predicate pushdown** (move filters toward the scans, through projections and sorts, and split across joins so each conjunct runs on the side that owns its columns), and **column pruning** (insert a narrow projection at each scan so a columnar read never touches a column the query ignores). `EXPLAIN` shows the plan before and after, so every rewrite is visible.
+
 ## Quickstart
 
 ```bash
@@ -74,22 +76,31 @@ for row in result.to_rows():
 Joins, filters, and scalar functions all work as you would expect:
 
 ```python
+db.load_csv("data/departments.csv")
 db.sql("""
-    SELECT e.name, d.building
+    SELECT e.name, d.location
     FROM employees e
-    JOIN departments d ON e.department = d.department
+    JOIN departments d ON e.department = d.name
     WHERE e.salary > 145000
     ORDER BY e.name
 """)
 ```
 
-Inspect the physical plan before running it:
+Inspect the plan, and watch the optimizer rewrite it. `EXPLAIN` returns the
+optimized plan; `explain_diff` shows both:
 
 ```python
-print(db.explain("SELECT department, AVG(salary) FROM employees GROUP BY department"))
-# Project([department, AVG(salary)])
-#   HashAggregate(keys=[__gk0], aggs=[__agg0])
+print(db.explain_diff("SELECT name FROM employees WHERE salary > 140000 AND 1 = 1"))
+# -- original plan --
+# Project([name])
+#   Filter(((salary > 140000) AND (1 = 1)))
 #     Scan(employees, rows=10)
+#
+# -- optimized plan --
+# Project([name])
+#   Filter((salary > 140000))          <- 1 = 1 folded away
+#     Project([name, salary])          <- scan pruned to used columns
+#       Scan(employees, rows=10)
 ```
 
 The same engine is also reachable through a fluent Python API, since the SQL
@@ -101,14 +112,64 @@ from prism import Relation, col
 Relation.from_table(employees, "employees").filter(col("salary") > 145000).select("name").collect()
 ```
 
+## Interfaces
+
+**An interactive SQL shell.** `prism data/employees.csv` drops you into a REPL
+that renders results as an aligned grid, times every query, introspects tables
+(`.tables`, `.schema`), and prints plans with `EXPLAIN`.
+
+```
+prism> SELECT department, COUNT(*) AS n FROM employees GROUP BY department;
+┌─────────────┬─────────┐
+│ department  │ n       │
+│ TEXT        │ INTEGER │
+├─────────────┼─────────┤
+│ Engineering │       5 │
+│ Research    │       5 │
+└─────────────┴─────────┘
+2 rows in set
+(2.7 ms)
+```
+
+**A browser query playground.** `prism --serve` (install `prism-sql[server]`)
+launches a single-page SQL workbench: write a query, run it against the sample
+data, and flip to the **Plan** tab to see the optimizer at work, the optimized
+operator tree shown next to the original.
+
+![The prism SQL playground](docs/playground.png)
+
+![The plan view, optimized next to original](docs/playground-plan.png)
+
+## Benchmarked against SQLite
+
+`benchmarks/compare_sqlite.py` runs every query on both prism and Python's
+built-in `sqlite3` and compares the results row for row, so SQLite doubles as a
+reference implementation. prism is pure Python and NumPy, so it is not chasing
+SQLite's C core; the result is that it returns **identical answers** and stays
+within a small factor on analytical queries:
+
+```
+rows: 30,000   (best of 3)
+
+query                     prism (ms)  sqlite (ms)   match
+---------------------------------------------------------
+filter-count                    3.39         1.59      ok
+group-by-region                15.02         7.72      ok
+group-by-product-avg           14.67         9.00      ok
+filter-project-sort             3.36         1.34      ok
+
+all results identical to SQLite
+```
+
 ## How it is verified
 
-Correctness is the whole point of building this by hand, so the test suite (250+ tests, CI on Python 3.10 through 3.13, strict mypy, coverage gate) pins down the parts that are easy to get subtly wrong:
+Correctness is the whole point of building this by hand, so the test suite (320+ tests, CI on Python 3.10 through 3.13, strict mypy, coverage gate) pins down the parts that are easy to get subtly wrong:
 
 - **Null semantics.** The full three-valued truth table for `AND`, `OR`, and `NOT` is tested across all nine combinations of `{TRUE, FALSE, NULL}`, along with null propagation through arithmetic and comparisons, and NULL join keys that never match.
 - **Aggregation.** COUNT ignores nulls but COUNT(\*) does not, AVG over an all-null group is NULL, DISTINCT aggregates deduplicate per group, and a global aggregate over an empty input still returns one row.
 - **Joins.** Inner and left joins, hash versus nested-loop paths, residual (non-equi) predicates, and null-padding of unmatched left rows.
 - **Type inference and ordering.** Integers stay integers, mixed columns widen to FLOAT, division always produces FLOAT, and multi-key sorts are stable with SQL null placement.
+- **Optimizer equivalence.** Every rewrite rule is checked both structurally (the plan changed as intended) and semantically (the optimized plan returns exactly the rows the unoptimized plan does), and the whole engine is differentially tested against SQLite.
 
 ## Roadmap
 
@@ -119,8 +180,9 @@ Correctness is the whole point of building this by hand, so the test suite (250+
 - [x] **Storage**: type-inferring CSV loader and an in-memory catalog
 - [x] **SQL frontend**: a lexer, a precedence-climbing parser, and a binding planner that compiles SQL to these operators
 - [x] **Aggregation and joins**: hash GROUP BY with HAVING and DISTINCT, the five core aggregates, hash and nested-loop joins (INNER and LEFT), and scalar functions
-- [ ] **Optimizer**: predicate and projection pushdown, constant folding, with before/after EXPLAIN
-- [ ] **Interfaces**: an interactive SQL shell and a browser query playground
+- [x] **Optimizer**: predicate and projection pushdown, constant folding, with before/after EXPLAIN
+- [x] **Interfaces**: an interactive SQL shell and a browser query playground
+- [x] **Benchmarked**: differentially tested against SQLite for correctness and timing
 
 ## Project layout
 
@@ -134,12 +196,15 @@ prism/
   functions.py        # scalar function registry (UPPER, ROUND, COALESCE, ...)
   relation.py         # chainable query builder over the operators
   engine.py           # Database: register tables, run SQL, EXPLAIN
+  format.py           # box-drawing table renderer for the shell
+  cli.py              # interactive SQL shell (prism command)
   sql/
     lexer.py          # SQL text -> tokens
     parser.py         # tokens -> AST (recursive descent + precedence climbing)
     ast.py            # the abstract syntax tree
   plan/
     planner.py        # bind the AST to a physical operator tree
+    optimizer.py      # rule-based rewrites (fold, pushdown, prune)
   exec/
     operators.py      # scan, filter, project, sort, limit (pull-based)
     aggregate.py      # hash aggregate and distinct
@@ -147,7 +212,9 @@ prism/
   storage/
     csv_loader.py     # CSV -> columnar table with type inference
     catalog.py        # in-memory registry of named tables
-tests/                # 250+ tests across every layer
+  server/             # optional FastAPI query playground (prism-sql[server])
+tests/                # 320+ tests across every layer
+benchmarks/           # differential benchmark against SQLite
 data/                 # sample CSV data
 ```
 
