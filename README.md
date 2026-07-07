@@ -44,13 +44,69 @@ Analytical databases are fast because of two decisions that show up everywhere i
 
 ## Quickstart
 
+Install it once:
+
 ```bash
 git clone https://github.com/SaadAsif-NU/prism.git
 cd prism
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
-pytest
 ```
+
+### Run it in your browser (easiest)
+
+Launch the query playground, then open the link it prints:
+
+```bash
+prism --serve
+```
+
+```
+prism playground on http://127.0.0.1:8000  (Ctrl+C to stop)
+```
+
+Open **http://127.0.0.1:8000** in your browser. The `employees` and
+`departments` sample tables are already loaded, so you can:
+
+1. Click a **sample query** on the left, or type your own SQL in the editor.
+2. Press **Ctrl/Cmd + Enter** (or the **Run** button) to run it.
+3. Switch to the **Plan** tab to watch the optimizer rewrite your query, the
+   optimized operator tree shown next to the original.
+
+To explore your own data instead, point it at any CSV files:
+
+```bash
+prism --serve path/to/your_data.csv
+```
+
+### Run it in the terminal
+
+For a SQL shell with formatted result tables and timing:
+
+```bash
+prism data/employees.csv data/departments.csv
+```
+
+```
+prism> SELECT department, COUNT(*) AS n FROM employees GROUP BY department;
+┌─────────────┬─────────┐
+│ department  │ n       │
+│ TEXT        │ INTEGER │
+├─────────────┼─────────┤
+│ Engineering │       5 │
+│ Research    │       5 │
+└─────────────┴─────────┘
+2 rows in set
+```
+
+Type `.help` for the available commands, or `.quit` to exit. You can also run a
+single query without entering the shell:
+
+```bash
+prism data/employees.csv -c "SELECT name, salary FROM employees ORDER BY salary DESC NULLS LAST LIMIT 3"
+```
+
+### Use it as a library
 
 Load a CSV and run SQL against it:
 
@@ -112,33 +168,23 @@ from prism import Relation, col
 Relation.from_table(employees, "employees").filter(col("salary") > 145000).select("name").collect()
 ```
 
-## Interfaces
+## The query playground
 
-**An interactive SQL shell.** `prism data/employees.csv` drops you into a REPL
-that renders results as an aligned grid, times every query, introspects tables
-(`.tables`, `.schema`), and prints plans with `EXPLAIN`.
-
-```
-prism> SELECT department, COUNT(*) AS n FROM employees GROUP BY department;
-┌─────────────┬─────────┐
-│ department  │ n       │
-│ TEXT        │ INTEGER │
-├─────────────┼─────────┤
-│ Engineering │       5 │
-│ Research    │       5 │
-└─────────────┴─────────┘
-2 rows in set
-(2.7 ms)
-```
-
-**A browser query playground.** `prism --serve` (install `prism-sql[server]`)
-launches a single-page SQL workbench: write a query, run it against the sample
-data, and flip to the **Plan** tab to see the optimizer at work, the optimized
-operator tree shown next to the original.
+`prism --serve` launches a single-page SQL workbench (see the Quickstart above
+to run it). Write a query, run it against the sample data, and browse the tables
+in the sidebar:
 
 ![The prism SQL playground](docs/playground.png)
 
+Flip to the **Plan** tab to see the optimizer at work, the optimized operator
+tree shown next to the original, so constant folding, predicate pushdown, and
+column pruning are all visible:
+
 ![The plan view, optimized next to original](docs/playground-plan.png)
+
+> The playground is an optional extra so the core engine stays dependency-free.
+> `pip install -e ".[dev]"` (from the Quickstart) already includes it; a minimal
+> install would add it with `pip install "prism-sql[server]"`.
 
 ## Benchmarked against SQLite
 
