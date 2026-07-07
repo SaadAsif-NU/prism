@@ -143,3 +143,52 @@ class TestMain:
         rc = main([str(path), "-c", "SELECT COUNT(*) AS c FROM nums", "--no-timing"])
         assert rc == 0
         assert "c" in capsys.readouterr().out
+
+    def test_serve_dispatch(self, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+        import prism.server
+
+        captured: dict = {}
+        monkeypatch.setattr(prism.server, "serve", lambda **kw: captured.update(kw), raising=True)
+        rc = main(["--serve", "--port", "9191"])
+        assert rc == 0
+        assert captured["port"] == 9191
+
+
+class TestRepl:
+    def _feed(self, monkeypatch, lines: list[str]) -> None:  # type: ignore[no-untyped-def]
+        it = iter(lines)
+
+        def fake_input(prompt: str = "") -> str:
+            try:
+                return next(it)
+            except StopIteration:
+                raise EOFError from None
+
+        monkeypatch.setattr("builtins.input", fake_input)
+
+    def test_runs_statement_then_quits(self, db: Database, monkeypatch, capsys) -> None:  # type: ignore[no-untyped-def]
+        from prism.cli import _repl
+
+        self._feed(monkeypatch, ["SELECT name FROM emp;", ".quit"])
+        assert _repl(db, timing=False) == 0
+        assert "Ada" in capsys.readouterr().out
+
+    def test_multiline_statement(self, db: Database, monkeypatch, capsys) -> None:  # type: ignore[no-untyped-def]
+        from prism.cli import _repl
+
+        self._feed(monkeypatch, ["SELECT name", "FROM emp;", ".quit"])
+        _repl(db, timing=False)
+        assert "Grace" in capsys.readouterr().out
+
+    def test_eof_exits_cleanly(self, db: Database, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+        from prism.cli import _repl
+
+        self._feed(monkeypatch, [])
+        assert _repl(db, timing=False) == 0
+
+    def test_error_is_reported(self, db: Database, monkeypatch, capsys) -> None:  # type: ignore[no-untyped-def]
+        from prism.cli import _repl
+
+        self._feed(monkeypatch, ["SELECT * FROM missing;", ".quit"])
+        _repl(db, timing=False)
+        assert "error" in capsys.readouterr().err

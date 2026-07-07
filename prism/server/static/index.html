@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>prism SQL playground</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo">◧</span>
+        <span class="name">prism</span>
+        <span class="tag">columnar SQL query engine</span>
+      </div>
+      <a class="repo" href="https://github.com/SaadAsif-NU/prism" target="_blank" rel="noreferrer">
+        github.com/SaadAsif-NU/prism
+      </a>
+    </header>
+
+    <main class="layout">
+      <aside class="sidebar">
+        <h2>Tables</h2>
+        <div id="tables" class="tables"></div>
+
+        <h2>Sample queries</h2>
+        <div id="samples" class="samples"></div>
+      </aside>
+
+      <section class="workspace">
+        <div class="editor-wrap">
+          <textarea
+            id="editor"
+            spellcheck="false"
+            placeholder="Write SQL here, then press Run (Ctrl/Cmd + Enter)"
+          ></textarea>
+          <div class="toolbar">
+            <button id="run" class="btn primary">Run &nbsp;<kbd>Ctrl</kbd>+<kbd>Enter</kbd></button>
+            <button id="explain" class="btn">Explain plan</button>
+            <span id="status" class="status"></span>
+          </div>
+        </div>
+
+        <div class="results">
+          <div class="tabs">
+            <button class="tab active" data-tab="result">Results</button>
+            <button class="tab" data-tab="plan">Plan</button>
+          </div>
+          <div id="panel-result" class="panel active">
+            <div id="result" class="result-area">
+              <p class="hint">Run a query to see results.</p>
+            </div>
+          </div>
+          <div id="panel-plan" class="panel">
+            <div id="plan" class="plan-area">
+              <p class="hint">Press "Explain plan" to see the optimized operator tree.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

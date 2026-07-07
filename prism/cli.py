@@ -159,9 +159,17 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("csv", nargs="*", help="CSV files to load (named by file stem)")
     parser.add_argument("-c", "--command", help="run a single SQL statement and exit")
+    parser.add_argument("--serve", action="store_true", help="launch the web playground")
+    parser.add_argument("--port", type=int, default=8000, help="port for --serve")
     parser.add_argument("--no-timing", action="store_true", help="do not print query timing")
     parser.add_argument("--version", action="version", version=f"prism {__version__}")
     args = parser.parse_args(argv)
+
+    if args.serve:
+        from prism.server import serve
+
+        serve(csv_paths=args.csv or None, port=args.port)
+        return 0
 
     db = Database()
     for path in args.csv:
